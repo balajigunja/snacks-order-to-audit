@@ -1,0 +1,26 @@
+import express from 'express';
+import cors from 'cors';
+import auth from './routes/auth.js';
+import masters from './routes/masters.js';
+import orders from './routes/orders.js';
+import invoices from './routes/invoices.js';
+import purchases from './routes/purchases.js';
+import production from './routes/production.js';
+import dispatch from './routes/dispatch.js';
+import payments from './routes/payments.js';
+import reports from './routes/reports.js';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.use('/api/auth', auth);
+app.use('/api/masters', masters);
+app.use('/api/orders', orders);
+app.use('/api/invoices', invoices);
+app.use('/api/purchases', purchases);
+app.use('/api/production', production);
+app.use('/api/dispatch', dispatch);
+app.use('/api/payments', payments);
+app.use('/api/reports', reports);
+export default app;
