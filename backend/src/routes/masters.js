@@ -5,7 +5,7 @@ import { requireLogin } from '../middleware/auth.js';
 const router = Router();
 router.use(requireLogin);
 
-
+// GET /api/masters/stock -> current balance of every item (base units)
 router.get('/stock', (req, res) => {
   const rows = db
     .prepare(
@@ -17,6 +17,20 @@ router.get('/stock', (req, res) => {
     )
     .all();
   res.json(rows);
+});
+
+// GET /api/masters/customers -> for the salesman's "select customer" dropdown
+router.get('/customers', (req, res) => {
+  res.json(db.prepare('SELECT id, name, gstin, state FROM customers ORDER BY name').all());
+});
+
+// GET /api/masters/products -> sellable products with price (the master price list)
+router.get('/products', (req, res) => {
+  res.json(
+    db.prepare(
+      "SELECT id, name, price_paisa, gst_rate_bp, hsn_code FROM items WHERE category = 'FG' ORDER BY name"
+    ).all()
+  );
 });
 
 export default router;
