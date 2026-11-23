@@ -122,13 +122,33 @@ CREATE TABLE IF NOT EXISTS invoices (
   invoice_no TEXT UNIQUE NOT NULL,   -- e.g. INV/2026-27/0001
   order_id INTEGER NOT NULL REFERENCES orders(id),
   date TEXT NOT NULL,
+  customer_id INTEGER NOT NULL REFERENCES customers(id),
+  customer_name TEXT NOT NULL,       -- copied at invoice time (snapshot)
+  customer_gstin TEXT,
+  place_of_supply TEXT NOT NULL,     -- customer's state: decides CGST+SGST or IGST
   taxable_paisa INTEGER NOT NULL,
   cgst_paisa INTEGER NOT NULL DEFAULT 0,
   sgst_paisa INTEGER NOT NULL DEFAULT 0,
   igst_paisa INTEGER NOT NULL DEFAULT 0,
   total_paisa INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'POSTED', -- POSTED, CANCELLED (never deleted)
-  dispatched INTEGER NOT NULL DEFAULT 0
+  dispatched INTEGER NOT NULL DEFAULT 0,
+  dispatched_at TEXT,
+  created_by INTEGER REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS invoice_lines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES invoices(id),
+  item_id INTEGER NOT NULL REFERENCES items(id),
+  item_name TEXT NOT NULL,
+  hsn_code TEXT,
+  qty INTEGER NOT NULL,
+  price_paisa INTEGER NOT NULL,
+  taxable_paisa INTEGER NOT NULL,
+  gst_rate_bp INTEGER NOT NULL,
+  cgst_paisa INTEGER NOT NULL DEFAULT 0,
+  sgst_paisa INTEGER NOT NULL DEFAULT 0,
+  igst_paisa INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS invoice_counters (
   fin_year TEXT PRIMARY KEY,         -- '2026-27'
