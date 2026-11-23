@@ -149,3 +149,21 @@ test('audit: every stock movement has a source document and balances reconcile',
   }
 });
 
+
+test('step 9: the accountant generates the month reports (read-only, CSV export)', async () => {
+  const acct = await login('accountant@snacks.test');
+  const list = (await call('/reports', 'GET', null, acct)).data;
+  const names = list.map((r) => r.name);
+  for (const need of ['sales-register', 'purchase-register', 'stock-summary', 'stock-ledger', 'production-variance',
+                      'collections', 'outstanding', 'gstr1', 'gstr3b']) {
+    assert.ok(names.includes(need), 'missing report ' + need);
+  }
+  for (const name of names) {
+    assert.strictEqual((await call(`/reports/${name}`, 'GET', null, acct)).status, 200, name);
+    const csv = await fetch(`${base}/reports/${name}?format=csv`, { headers: { Authorization: 'Bearer ' + acct } });
+    assert.strictEqual(csv.status, 200, name + ' csv');
+  }
+  // the auditor can read but not change anything
+  assert.strictEqual((await call('/purchases', 'POST', { lines: [] }, acct)).status, 403);
+  assert.strictEqual((await call('/payments', 'POST', { invoiceId: 1, amountRupees: 1 }, acct)).status, 403);
+});
