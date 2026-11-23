@@ -8,11 +8,12 @@ import { variancePctX100, isFlagged } from '../services/variance.js';
 import { logAudit } from '../services/audit.js';
 import { toBase, baseUnitOf } from '../utils/units.js';
 import { rupeesToPaisa } from '../utils/money.js';
+import { todayIST } from '../utils/dates.js';
 
 const router = Router();
 router.use(requireLogin);
 const MAKERS = ['PRODUCTION', 'ADMIN'];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayIST;
 
 // ---------- small helpers ----------
 const getBomLines = (bomId) =>

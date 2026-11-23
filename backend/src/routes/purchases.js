@@ -5,6 +5,7 @@ import { allowRoles } from '../middleware/roles.js';
 import { addEntry } from '../services/stockLedger.js';
 import { toBase, baseUnitOf } from '../utils/units.js';
 import { rupeesToPaisa } from '../utils/money.js';
+import { todayIST } from '../utils/dates.js';
 
 const router = Router();
 router.use(requireLogin);
@@ -14,7 +15,7 @@ router.post('/', allowRoles('PRODUCTION', 'ADMIN'), (req, res) => {
   try {
     const { date, supplier, lines } = req.body || {};
     if (!Array.isArray(lines) || lines.length === 0) throw new Error('Add at least one line');
-    const purchaseDate = date || new Date().toISOString().slice(0, 10);
+    const purchaseDate = date || todayIST();
 
     // One transaction: the purchase and ALL its stock entries succeed together, or none do.
     const result = runInTransaction(() => {
