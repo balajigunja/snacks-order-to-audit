@@ -24,7 +24,7 @@ export default function App() {
       <Route path="/salesman" element={<Protected roles={['SALESMAN']}><SalesmanOrders /></Protected>} />
       <Route path="/admin" element={<Protected roles={['ADMIN']}><AdminOrders /></Protected>} />
       <Route path="/production" element={<Protected roles={['PRODUCTION', 'ADMIN']}><ProductionPage /></Protected>} />
-      <Route path="/reports" element={<Protected roles={['ACCOUNTANT', 'ADMIN', 'OWNER']}><Reports /></Protected>} />
+      <Route path="/reports" element={<Protected roles={['ACCOUNTANT', 'ADMIN', 'OWNER', 'PRODUCTION']}><Reports /></Protected>} />
       <Route path="/owner" element={<Protected roles={['OWNER']}><OwnerDashboard /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -95,3 +95,31 @@ tr.total-row td { font-weight: 500; background: #f8f9fa; }
 .login { max-width: 400px; margin: 40px auto; padding: 0 16px; }
 .login .card { padding: 28px; }
 .demo { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* ===== desktop screens ===== */
+.nav { background: #fff; border-bottom: 1px solid var(--line); padding: 0 16px; display: flex; gap: 4px; }
+.nav a { padding: 12px 16px; color: var(--muted); text-decoration: none; border-bottom: 3px solid transparent; }
+.nav a.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 500; }
+.nav a:hover { background: #f1f3f4; }
+
+.split { display: grid; grid-template-columns: minmax(300px, 2fr) 3fr; gap: 16px; align-items: start; }
+@media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+.list-item { display: flex; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); cursor: pointer; background: #fff; }
+.list-item:hover { background: #f8f9fa; }
+.list-item.selected { background: #e8f0fe; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.pill { font: inherit; font-size: 13px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 16px; background: #fff; cursor: pointer; color: var(--muted); }
+.pill.active { background: #e8f0fe; border-color: var(--blue); color: var(--blue); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.line-input { width: 90px; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; text-align: right; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.kpi .big { font-size: 28px; font-weight: 500; margin: 4px 0; }
+.kpi .label { color: var(--muted); font-size: 13px; }
+.report-menu a { display: block; padding: 10px 12px; color: var(--text); text-decoration: none; border-left: 3px solid transparent; cursor: pointer; }
+.report-menu a:hover { background: #f1f3f4; }
+.report-menu a.active { background: #e8f0fe; border-left-color: var(--blue); color: var(--blue); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
+.toolbar label { margin: 0 0 4px; }
+.toolbar .input { width: 160px; }
+.mb { margin-bottom: 16px; }
