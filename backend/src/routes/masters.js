@@ -33,4 +33,17 @@ router.get('/products', (req, res) => {
   );
 });
 
+// GET /api/masters/boms -> recipes (Bill of Materials) with their lines, quantities in base units (g, ml, pcs)
+router.get('/boms', (req, res) => {
+  const boms = db.prepare(
+    `SELECT b.id, b.fg_item_id, i.name AS product, b.batch_output_qty
+     FROM boms b JOIN items i ON i.id = b.fg_item_id ORDER BY b.id`
+  ).all();
+  const lines = db.prepare(
+    `SELECT bl.item_id, bl.qty, i.name, i.category, i.base_unit
+     FROM bom_lines bl JOIN items i ON i.id = bl.item_id WHERE bl.bom_id = ? ORDER BY bl.id`
+  );
+  res.json(boms.map((b) => ({ ...b, lines: lines.all(b.id) })));
+});
+
 export default router;
