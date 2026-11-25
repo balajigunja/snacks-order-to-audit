@@ -27,6 +27,7 @@ runInTransaction(() => {
   const addCustomer = db.prepare('INSERT INTO customers (name, gstin, state, salesman_id) VALUES (?, ?, ?, ?)');
   addCustomer.run('Retailer A', '33AAAAA1111A1Z1', 'Tamil Nadu', salesmanA);
   addCustomer.run('Distributor B', '29BBBBB2222B1Z2', 'Karnataka', salesmanB);
+  addCustomer.run('Retailer C', '27CCCCC3333C1Z3', 'Maharashtra', salesmanA);
 
   // ---------- 3. ITEMS ----------
   const addItem = db.prepare(
