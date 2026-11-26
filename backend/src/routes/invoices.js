@@ -1,15 +1,38 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import db, { runInTransaction } from '../db/connection.js';
-import { requireLogin } from '../middleware/auth.js';
+import { requireLogin, JWT_SECRET } from '../middleware/auth.js';
 import { allowRoles } from '../middleware/roles.js';
 import { calculateGst } from '../utils/gst.js';
 import { todayIST } from '../utils/dates.js';
 import { nextInvoiceNo } from '../services/invoiceNumber.js';
+import { buildInvoicePdf, invoiceFileName } from '../services/invoicePdf.js';
 import { logAudit } from '../services/audit.js';
 
 const router = Router();
-router.use(requireLogin);
 const FACTORY_STATE = process.env.FACTORY_STATE || 'Tamil Nadu';
+
+function sendPdf(res, pdf, invoiceNo) {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${invoiceFileName(invoiceNo)}"`);
+  res.send(pdf);
+}
+
+// ---------- PUBLIC: the customer opens the link from WhatsApp or email (no login) ----------
+// The link carries a signed token (valid 30 days). Nobody can guess another invoice's link.
+router.get('/share/:token', async (req, res) => {
+  try {
+    const t = jwt.verify(req.params.token, JWT_SECRET);
+    if (t.purpose !== 'invoice-share') throw new Error('wrong kind of token'); // a login token must not work here
+    const inv = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(t.invoiceId);
+    sendPdf(res, await buildInvoicePdf(t.invoiceId), inv.invoice_no);
+  } catch {
+    res.status(404).json({ error: 'This link is invalid or has expired' });
+  }
+});
+
+// everything below needs a login
+router.use(requireLogin);
 
 // POST /api/invoices   body: { orderId }   -> turns an APPROVED order into a GST tax invoice
 router.post('/', allowRoles('ADMIN'), (req, res) => {
@@ -86,6 +109,33 @@ router.get('/:id', allowRoles('ADMIN', 'ACCOUNTANT', 'OWNER'), (req, res) => {
   const lines = db.prepare('SELECT * FROM invoice_lines WHERE invoice_id = ?').all(inv.id);
   const paid = db.prepare('SELECT COALESCE(SUM(amount_paisa), 0) AS p FROM payments WHERE invoice_id = ?').get(inv.id).p;
   res.json({ ...inv, lines, paid_paisa: paid, outstanding_paisa: inv.total_paisa - paid });
+});
+
+// GET /api/invoices/:id/pdf -> the invoice as a PDF file
+router.get('/:id/pdf', allowRoles('ADMIN', 'ACCOUNTANT', 'OWNER'), async (req, res) => {
+  const inv = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(Number(req.params.id));
+  if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+  sendPdf(res, await buildInvoicePdf(Number(req.params.id)), inv.invoice_no);
+});
+
+// GET /api/invoices/:id/share -> links to send the invoice by WhatsApp or email
+router.get('/:id/share', allowRoles('ADMIN'), (req, res) => {
+  const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(Number(req.params.id));
+  if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+
+  const token = jwt.sign({ invoiceId: inv.id, purpose: 'invoice-share' }, JWT_SECRET, { expiresIn: '30d' });
+  // When the app is online for real, set PUBLIC_URL in .env so the link works for the customer
+  const base = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+  const pdfUrl = `${base}/api/invoices/share/${token}`;
+  const message =
+    `Hello ${inv.customer_name}, your tax invoice ${inv.invoice_no} dated ${inv.date} ` +
+    `for Rs. ${(inv.total_paisa / 100).toFixed(2)} is ready. You can download it here: ${pdfUrl}`;
+
+  res.json({
+    pdfUrl, message,
+    whatsappUrl: 'https://wa.me/?text=' + encodeURIComponent(message),
+    emailUrl: `mailto:?subject=${encodeURIComponent('Tax invoice ' + inv.invoice_no)}&body=${encodeURIComponent(message)}`
+  });
 });
 
 export default router;
