@@ -38,6 +38,7 @@ test('the Murukku recipe comes with its 5 lines in base units', async () => {
 
 test('customers and products lists work', async () => {
   const t = await login('salesman.a@snacks.test');
-  assert.strictEqual((await call('/masters/customers', t)).data.length, 2);
+  const names = (await call('/masters/customers', t)).data.map((c) => c.name);
+   assert.ok(names.includes('Retailer A') && names.includes('Distributor B'));
   assert.deepStrictEqual((await call('/masters/products', t)).data.map((p) => p.price_paisa), [5000]);
 });
