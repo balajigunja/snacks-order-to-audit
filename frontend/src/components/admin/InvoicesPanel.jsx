@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '../../api.js';
+import { api, downloadFile } from '../../api.js';
 import { formatINR } from '../../format.js';
 import Message from '../Message.jsx';
 
@@ -9,9 +9,14 @@ export default function InvoicesPanel() {
   const [amount, setAmount] = useState('');
   const [mode, setMode] = useState('UPI');
   const [message, setMessage] = useState(null);
+  const [share, setShare] = useState(null);      // WhatsApp / email / copy links for the open invoice
 
   const loadList = useCallback(async () => setInvoices(await api('/invoices')), []);
-  const openInvoice = useCallback(async (id) => { setInv(await api('/invoices/' + id)); setAmount(''); }, []);
+  const openInvoice = useCallback(async (id) => {
+    setInv(await api('/invoices/' + id));
+    setAmount('');
+    try { setShare(await api(`/invoices/${id}/share`)); } catch { setShare(null); }
+  }, []);
   useEffect(() => { loadList(); }, [loadList]);
 
   async function act(fn, okText) {
@@ -23,6 +28,19 @@ export default function InvoicesPanel() {
       await openInvoice(inv.id);
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
+    }
+  }
+
+  async function downloadPdf() {
+    try { await downloadFile(`/invoices/${inv.id}/pdf`, inv.invoice_no.replace(/\//g, '-') + '.pdf'); }
+    catch (err) { setMessage({ type: 'error', text: err.message }); }
+  }
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(share.pdfUrl);
+      setMessage({ type: 'ok', text: 'Link copied. Paste it in any chat or email.' });
+    } catch {
+      setMessage({ type: 'info', text: 'Copy this link: ' + share.pdfUrl });
     }
   }
 
@@ -90,6 +108,13 @@ export default function InvoicesPanel() {
                 <tr className="total-row"><td>Outstanding</td><td className="num">{formatINR(inv.outstanding_paisa)}</td></tr>
               </tbody>
             </table>
+
+            <div className="actions">
+              <button className="btn btn-primary" onClick={downloadPdf}>Download PDF</button>
+              {share && <a className="btn" href={share.whatsappUrl} target="_blank" rel="noreferrer">Share on WhatsApp</a>}
+              {share && <a className="btn" href={share.emailUrl}>Share by email</a>}
+              {share && <button className="btn" onClick={copyLink}>Copy link</button>}
+            </div>
 
             <div className="actions">
               {!inv.dispatched && inv.status === 'POSTED' && <button className="btn btn-buy" onClick={dispatch}>Record dispatch</button>}

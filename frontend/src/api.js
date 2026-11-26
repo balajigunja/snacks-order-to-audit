@@ -29,13 +29,13 @@ export async function api(path, method = 'GET', body) {
   return data;
 }
 
-// Download a report as a CSV file (the browser must send the token, so a plain link will not work).
-export async function downloadCsv(path, filename) {
-  const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch('/api' + path + sep + 'format=csv', {
-    headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
-  });
-  if (!res.ok) throw new ApiError('Download failed', res.status);
+// Download any file (PDF invoice, CSV report). The browser must send the token, so a plain link will not work.
+export async function downloadFile(path, filename) {
+  const res = await fetch('/api' + path, { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new ApiError((data && data.error) || 'Download failed', res.status);
+  }
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement('a');
   a.href = url;
@@ -43,3 +43,7 @@ export async function downloadCsv(path, filename) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// a report as a CSV file
+export const downloadCsv = (path, filename) =>
+  downloadFile(path + (path.includes('?') ? '&' : '?') + 'format=csv', filename);

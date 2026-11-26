@@ -123,3 +123,6 @@ tr.total-row td { font-weight: 500; background: #f8f9fa; }
 .toolbar label { margin: 0 0 4px; }
 .toolbar .input { width: 160px; }
 .mb { margin-bottom: 16px; }
+
+/* links that look like buttons (WhatsApp and email share) */
+a.btn { display: inline-block; text-decoration: none; }
