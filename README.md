@@ -1,7 +1,7 @@
 # Order-to-Audit System (Snacks Factory)
 **Centre for Digital Infrastructure, NIT Tiruchirappalli — Winter Internship 2026**
 
-A single-entry **Order-to-Audit** prototype for a small-scale South Indian packaged snacks manufacturer. Every field order, raw material purchase, production batch, GST invoice, dispatch, and collection is recorded once at its source and flows automatically into an append-only stock ledger, weighted-average packet costing, and auditor-ready reports.
+A single-entry **Order-to-Audit** prototype for a small-scale South Indian packaged snacks manufacturer. Every field order, raw-material purchase, production batch, GST invoice, dispatch, and payment collection is entered once at its source and flows automatically into an append-only stock ledger, weighted-average packet costing, and auditor-ready monthly reports.
 
 ---
 
@@ -9,31 +9,46 @@ A single-entry **Order-to-Audit** prototype for a small-scale South Indian packa
 
 | Layer | Choice | Why |
 | :--- | :--- | :--- |
-| **Backend** | Node.js + Express (ESM) | Lightweight, single-language stack across server and UI with fast JSON/REST handling. |
-| **Database** | SQLite (`node:sqlite` built-in) | Zero-configuration single-file relational DB supporting ACID transactions, foreign keys, and SQL aggregations without external DB setup. |
-| **Frontend** | React 18 + Vite | Fast mobile-first UI for field salesmen (with `localStorage` offline queue) and multi-pane desktop views for factory operations. |
-| **Auth & RBAC** | JWT + `bcryptjs` | Stateless role-based access control enforced on every API route (`SALESMAN`, `ADMIN`, `PRODUCTION`, `ACCOUNTANT`, `OWNER`). |
-| **Documents & Exports** | `pdfkit` + UTF-8 BOM CSV | Pure-JS GST tax invoice PDF generation (with Indian lakh/crore amount-in-words) and formula-safe Excel/CSV audit exports. |
+| **Backend** | Node.js + Express (ESM) | Lightweight, single-language stack across server and UI with clean REST endpoints. |
+| **Database** | SQLite (`node:sqlite` built-in) | Zero-configuration single-file relational database supporting ACID transactions, foreign keys, and SQL ledger aggregations with no external DB installation. |
+| **Frontend** | React 18 + Vite | Mobile-first order capture for field salesmen (with `localStorage` offline queue) and multi-pane desktop views for factory operations. |
+| **Auth & RBAC** | JWT + `bcryptjs` | Role-based access control enforced on every route (`SALESMAN`, `ADMIN`, `PRODUCTION`, `ACCOUNTANT`, `OWNER`). |
+| **Documents & Exports** | `pdfkit` + UTF-8 BOM CSV | Pure-JS GST tax invoice PDF generation (with Indian lakh/crore amount-in-words) and formula-safe CSV audit exports for Excel. |
 
 ---
 
-## 2. Quick Start (Single-Command Runner)
+## 2. Setup & Run Instructions
 
 ### Prerequisites
-- **Node.js v22.5+** (uses built-in `node:sqlite` and `node:test`; no native C++ compiler or external database needed).
+- **Node.js v22.5+** (uses built-in `node:sqlite` and `node:test`).
 
-### Run Locally in One Command
-From the repository root (`D:\order-to-audit` or `./order-to-audit`):
+### Start Backend & Frontend
+Open two terminals in the repository root:
 
+**Terminal 1 — Backend API (`http://localhost:5000`):**
 ```bash
-npm run setup
-npm start
+cd backend
+npm install
+npm run db:init
+npm run seed
+npm run dev
 ```
 
-- **`npm run setup`**: Installs backend & frontend dependencies, initializes `backend/factory.db` from `schema.sql`, and seeds the Section 5 Murukku benchmark dataset.
-- **`npm start`**: Starts the Express API (`http://localhost:5000`) and Vite frontend (`http://localhost:5173`) together.
-- **`npm test`**: Runs all 11 automated unit & integration test suites (including the full Section 5 benchmark test).
-- **`npm run db:reset`**: Wipes `backend/factory.db`, recreates tables, and reloads fresh Section 5 seed data for a clean demo run.
+**Terminal 2 — Frontend UI (`http://localhost:5173`):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Run Automated Tests (All 11 Suites)
+```bash
+cd backend
+npm test
+```
+
+### Reset Database for a Fresh Benchmark Run
+Delete `backend/factory.db`, then re-run `npm run db:init` and `npm run seed` inside `backend/`.
 
 ### Demo Login Credentials (Password: `password123`)
 
@@ -50,26 +65,26 @@ npm start
 
 ## 3. Core Engineering Rules
 
-1. **Integer-Paisa Arithmetic:** All monetary values are stored and computed as whole integer paisa (`₹50.00 = 5000`), eliminating floating-point rounding drift.
-2. **Base-Unit Inventory Storage:** Quantities are stored as integers in smallest base units (`1 kg = 1000 g`, `1 L = 1000 ml`, `1 packet/pouch/carton = 1 pcs`).
-3. **Append-Only Stock Ledger:** Stock balances are never overwritten. Every receipt, production issue, production output, dispatch, or credit-note adjustment appends an immutable row to `stock_ledger` linked to its `source_doc`.
-4. **Audit Trail & Credit Notes:** Edits to orders, overheads, dispatches, and invoice cancellations are recorded with user ID and timestamp in `audit_log`. Posted invoices are never deleted—cancelling an invoice issues a `credit_notes` record and restores dispatched stock.
+1. **Integer-Paisa Arithmetic:** All monetary amounts are stored and calculated as whole integer paisa (`₹50.00 = 5000`), avoiding floating-point drift.
+2. **Base-Unit Inventory Storage:** Physical quantities are stored as integers in smallest base units (`1 kg = 1000 g`, `1 L = 1000 ml`, `1 packet/pouch/carton = 1 pcs`).
+3. **Append-Only Stock Ledger:** Stock balances are never overwritten. Every opening balance, purchase, production issue, production output, or dispatch inserts an immutable row into `stock_ledger` linked to its `source_doc`.
+4. **Audit Trail:** Order edits, approvals, invoice creations, dispatches, payments, and overhead entries are logged with user ID and timestamp in `audit_log`.
 
 ---
 
 ## 4. Costing Method & Overhead Allocation Rule
 
 - **Inventory Valuation Method — Weighted Average Cost:**
-  $$	ext{Average Unit Cost} = rac{	ext{Total Stock Value in Ledger (paisa)}}{	ext{Total Quantity on Hand (base units)}}$$
-  *Justification:* Raw materials like flour and cooking oil are stored in bulk containers where batches mix physically, making weighted average more realistic than FIFO/LIFO for a small snack factory while smoothing purchase price fluctuations (`₹42/kg` opening flour + `₹45/kg` new purchase = `₹43.125/kg`).
+  $$\text{Average Unit Cost} = \frac{\text{Total Stock Value in Ledger (paisa)}}{\text{Total Quantity on Hand (base units)}}$$
+  *Justification:* Bulk ingredients such as flour and cooking oil are stored in shared containers where batches mix physically, making weighted average more realistic than FIFO/LIFO for a small snack factory while smoothing purchase price changes (`₹42/kg` opening flour + `₹45/kg` new purchase = `₹43.125/kg`).
 - **Overhead Allocation Rule — Direct Per-Run Allocation over Good Output:**
-  Direct batch overheads (labour + gas/power entered for the run) are added to actual raw + packaging material cost and divided by **good saleable packets produced** (`188` packets), ensuring abnormal yield loss (`-6%`) is surfaced transparently in unit cost and margin.
+  Direct batch overheads (labour + gas/power entered for the run) are added to actual raw + packaging material cost and divided by **good saleable packets produced** (`188` packets), ensuring yield loss (`-6%`) is reflected accurately in packet cost and margin.
 
 ---
 
 ## 5. Section 5 Benchmark Results
 
-Running `npm test` executes `backend/tests/benchmark.test.js` end-to-end with the exact Section 5 master data:
+Running `npm test` inside `backend/` executes `tests/benchmark.test.js` end-to-end with the exact Section 5 master data:
 
 | Benchmark Checkpoint | Expected | System Output | Notes |
 | :--- | :--- | :--- | :--- |
@@ -116,5 +131,6 @@ Running `npm test` executes `backend/tests/benchmark.test.js` end-to-end with th
 ## 7. Documented Assumptions & Known Gaps
 
 1. **Opening Finished-Goods Valuation:** The 50 opening packets of `Murukku 200 g` in Section 5 do not specify an opening unit cost and are seeded with `0` ledger value; run cost per packet (`₹31.14`) is computed strictly from Run #1's actual material consumption (`₹4,055.00`) plus Run #1's overheads (`₹1,800.00`) divided by `188` good packets.
-2. **Audit Report Export Formats:** Tax invoices export directly as formatted PDFs (`/api/invoices/:id/pdf`), whereas all 12 monthly audit reports export as UTF-8 BOM CSV files (`/api/reports/:name?format=csv`) designed to open cleanly in Microsoft Excel without formula injection.
-3. **Single-Batch Dispatch & Batch Expiry:** Each invoice dispatches in full (`POST /api/dispatch`), and batch/expiry FEFO tracking is omitted in favor of keeping the core ledger deterministic and auditable.
+2. **Invoice Cancellation Workflow:** The database schema includes `credit_notes` and `invoices.status = 'CANCELLED'` (and the `outstanding` report already deducts credit notes), while the UI/API endpoint for issuing a credit note on a posted invoice is left as a future enhancement.
+3. **Report Export Formats:** Tax invoices export directly as formatted PDFs (`/api/invoices/:id/pdf`), whereas all 12 monthly audit reports export as UTF-8 BOM CSV files (`/api/reports/:name?format=csv`) designed to open cleanly in Microsoft Excel without formula injection.
+4. **Full-Order Dispatch:** Each invoice dispatches in full (`POST /api/dispatch`), and batch/expiry FEFO tracking is omitted in favor of keeping the core ledger deterministic and auditable.

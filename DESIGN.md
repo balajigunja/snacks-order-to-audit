@@ -56,19 +56,19 @@ All financial values are stored as **integer paisa** (`₹1 = 100 paisa`) and al
 
 ### Append-Only Ledger Reconciliation
 Direct `UPDATE` or `DELETE` operations on stock quantities are prohibited. Every physical movement inserts a row into `stock_ledger`:
-$$	ext{Balance}_{t} = 	ext{Balance}_{t-1} + \Delta q_t, \quad 	ext{enforcing } 	ext{Balance}_{t} \ge 0$$
+$$\text{Balance}_{t} = \text{Balance}_{t-1} + \Delta q_t, \quad \text{enforcing } \text{Balance}_{t} \ge 0$$
 
 For any reporting period $[t_1, t_2]$, the Stock Summary report reconciles every SKU strictly from ledger entries:
-$$	ext{Closing} = 	ext{Opening}_{< t_1} + \sum 	ext{Receipts}_{[t_1, t_2]} - \sum 	ext{Issues}_{[t_1, t_2]} + \sum 	ext{Adjustments}_{[t_1, t_2]}$$
+$$\text{Closing} = \text{Opening}_{< t_1} + \sum \text{Receipts}_{[t_1, t_2]} - \sum \text{Issues}_{[t_1, t_2]} + \sum \text{Adjustments}_{[t_1, t_2]}$$
 
 ### Unit Conversions & BOM Scaling
 Inputs in human units (`kg`, `litre`, `pcs`) are validated against the item's `base_unit` (`g`, `ml`, `pcs`) and converted via integer multipliers (`×1000` for `kg -> g` and `litre -> ml`). For a production run of $B$ batches:
-$$	ext{Standard Qty}_i = 	ext{BOM Qty}_i 	imes B, \quad 	ext{Expected Yield} = 	ext{Batch Output} 	imes B$$
+$$\text{Standard Qty}_i = \text{BOM Qty}_i \times B, \quad \text{Expected Yield} = \text{Batch Output} \times B$$
 
 ### Variance & Tolerance Flagging
 Material consumption variance and output yield variance are stored as integer basis points of percent (`pct_x100`, where `-600` = `-6.00%`):
-$$	ext{Variance}_{\% 	imes 100} = 	ext{round}\left(rac{	ext{Actual} - 	ext{Standard}}{	ext{Standard}} 	imes 10000ight)$$
-Any material or yield line where $|	ext{Variance}_{\% 	imes 100}| > 300$ (`3.00%` configurable threshold) sets `flagged = 1` and surfaces on the Production and Owner dashboards.
+$$\text{Variance}_{\% \times 100} = \text{round}\left(\frac{\text{Actual} - \text{Standard}}{\text{Standard}} \times 10000\right)$$
+Any material or yield line where $|\text{Variance}_{\% \times 100}| > 300$ (`3.00%` configurable threshold) sets `flagged = 1` and surfaces on the Production and Owner dashboards.
 
 ---
 
@@ -76,13 +76,13 @@ Any material or yield line where $|	ext{Variance}_{\% 	imes 100}| > 300$ (`3.00%
 
 1. **Weighted-Average Material Valuation:**
    Each receipt adds positive `value_paisa` to `stock_ledger`; each issue deducts value at the current average rate immediately before posting:
-   $$	ext{Issue Value (paisa)} = 	ext{round}\left(rac{\sum 	ext{Value on Hand (paisa)} 	imes 	ext{Issued Qty}}{	ext{Qty on Hand}}ight)$$
+   $$\text{Issue Value (paisa)} = \text{round}\left(\frac{\sum \text{Value on Hand (paisa)} \times \text{Issued Qty}}{\text{Qty on Hand}}\right)$$
    *Benchmark trace:* Opening flour (`100 kg @ ₹42 = ₹4,200`) + Purchase #1 (`60 kg @ ₹45 = ₹2,700`) = `₹6,900` across `160 kg` (`₹43.125/kg`). Issuing `40 kg` charges **`₹1,725.00`** (`172500` paisa) to Run #1.
 2. **Batch Material Total (Run #1):**
    Flour (`₹1,725.00`) + Cooking oil (`10.5 L @ ₹140 = ₹1,470.00`) + Spice mix (`1.2 kg @ ₹200 = ₹240.00`) + Pouches (`194 × ₹2.50 = ₹485.00`) + Cartons (`9 × ₹15 = ₹135.00`) = **`₹4,055.00`**.
 3. **Overhead Allocation & Packet Margin:**
    Direct run overheads (`₹1,200.00` labour + `₹600.00` gas/power = `₹1,800.00`) are allocated per batch and divided by **good packets produced** (`188`):
-   $$	ext{Cost per Packet} = 	ext{round}\left(rac{405500 + 180000}{188}ight) = 3114	ext{ paisa} = \mathbf{₹31.14}$$
+   $$\text{Cost per Packet} = \text{round}\left(\frac{405500 + 180000}{188}\right) = 3114\text{ paisa} = \mathbf{₹31.14}$$
    Against the `₹50.00` (`5000` paisa) pre-tax selling price, gross profit is **`₹18.86/packet`** (**`37.72%`** margin).
 
 ---
@@ -90,5 +90,5 @@ Any material or yield line where $|	ext{Variance}_{\% 	imes 100}| > 300$ (`3.00%
 ## 4. GST Compliance, Auditability & Offline Sync
 
 - **GST Place-of-Supply Engine:** Compares `customer.state` against `FACTORY_STATE` (`Tamil Nadu`). Intra-state invoices split `gst_rate_bp` (`500` bp = `5%`) equally into `CGST` (`2.5%`) and `SGST` (`2.5%`); inter-state invoices assign `100%` of tax to `IGST`. Invoice numbers increment atomically per April–March financial year (`INV/2026-27/0001`) inside the creation transaction so sequence numbers never skip on rollback.
-- **Immutability & Audit Trail:** Every order edit, approval, invoice creation, dispatch, payment, overhead update, and invoice cancellation writes before/after JSON snapshots to `audit_log`. Cancelling a posted invoice creates a `credit_notes` entry and reverses dispatched stock via an `ADJUSTMENT` ledger row rather than deleting records.
+- **Audit Trail:** Every order edit, approval, invoice creation, dispatch, payment, and overhead update writes before/after JSON snapshots to `audit_log`. Posted invoices are never deleted (`status` remains `'POSTED'` or `'CANCELLED'`).
 - **Offline Field Order Sync:** The mobile salesman view caches masters in `localStorage`, queues offline orders with a client-generated `client_uuid` (`UNIQUE` constraint in `orders`), and auto-flushes on the browser `online` event with idempotent duplicate protection.
