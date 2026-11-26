@@ -99,3 +99,25 @@ test('invoice list shows outstanding', async () => {
   const list = await call('/invoices', 'GET', null, admin);
   assert.strictEqual(list.data[1].outstanding_paisa, 787500); // nothing paid yet
 });
+
+test('posted invoice cancellation issues a credit note, logs audit, and restores dispatched stock', async () => {
+  assert.strictEqual((await call('/invoices/1/cancel', 'POST', {}, admin)).status, 400);
+  assert.strictEqual((await call('/invoices/1/cancel', 'POST', { reason: 'Test' }, salA)).status, 403);
+
+  const r = await call('/invoices/1/cancel', 'POST', { reason: 'Damaged in transit' }, admin);
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.status, 'CANCELLED');
+  assert.strictEqual(r.data.credited_paisa, 787500);
+  assert.strictEqual(r.data.stockRestored, true);
+  assert.strictEqual(getBalance(MURUKKU), 238); // 88 + 150 restored
+
+  const cn = db.prepare('SELECT * FROM credit_notes WHERE invoice_id = 1').get();
+  assert.strictEqual(cn.amount_paisa, 787500);
+  assert.strictEqual(cn.reason, 'Damaged in transit');
+
+  const log = db.prepare("SELECT * FROM audit_log WHERE action = 'INVOICE_CANCELLED' AND record_id = 1").get();
+  assert.ok(log);
+
+  // cannot cancel twice
+  assert.strictEqual((await call('/invoices/1/cancel', 'POST', { reason: 'Again' }, admin)).status, 400);
+});

@@ -7,6 +7,7 @@ import { calculateGst } from '../utils/gst.js';
 import { todayIST } from '../utils/dates.js';
 import { nextInvoiceNo } from '../services/invoiceNumber.js';
 import { buildInvoicePdf, invoiceFileName } from '../services/invoicePdf.js';
+import { addEntry } from '../services/stockLedger.js';
 import { logAudit } from '../services/audit.js';
 
 const router = Router();
@@ -25,6 +26,7 @@ router.get('/share/:token', async (req, res) => {
     const t = jwt.verify(req.params.token, JWT_SECRET);
     if (t.purpose !== 'invoice-share') throw new Error('wrong kind of token'); // a login token must not work here
     const inv = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(t.invoiceId);
+    if (!inv) throw new Error('Invoice not found');
     sendPdf(res, await buildInvoicePdf(t.invoiceId), inv.invoice_no);
   } catch {
     res.status(404).json({ error: 'This link is invalid or has expired' });
@@ -87,6 +89,71 @@ router.post('/', allowRoles('ADMIN'), (req, res) => {
                taxable_paisa: taxable, cgst_paisa: cgst, sgst_paisa: sgst, igst_paisa: igst, total_paisa: total };
     });
     res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/invoices/:id/cancel   body: { reason }   -> cancels a posted invoice with a credit note (never deleted)
+router.post('/:id/cancel', allowRoles('ADMIN'), (req, res) => {
+  try {
+    const inv = db.prepare('SELECT * FROM invoices WHERE id = ?').get(Number(req.params.id));
+    if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+    if (inv.status === 'CANCELLED') throw new Error('Invoice is already cancelled');
+
+    const reason = String((req.body || {}).reason || '').trim();
+    if (!reason) throw new Error('Please provide a cancellation reason');
+
+    const paid = db.prepare('SELECT COALESCE(SUM(amount_paisa), 0) AS p FROM payments WHERE invoice_id = ?').get(inv.id).p;
+    if (paid > 0) throw new Error('Cannot cancel an invoice that has recorded payments');
+
+    const result = runInTransaction(() => {
+      const creditNoteId = Number(
+        db.prepare('INSERT INTO credit_notes (invoice_id, date, reason, amount_paisa) VALUES (?, ?, ?, ?)')
+          .run(inv.id, todayIST(), reason, inv.total_paisa).lastInsertRowid
+      );
+
+      if (inv.dispatched === 1) {
+        const dispatchedRows = db.prepare(
+          `SELECT item_id, change_qty, value_paisa FROM stock_ledger
+           WHERE source_doc = ? AND entry_type = 'DISPATCH'`
+        ).all(`Invoice ${inv.invoice_no}`);
+
+        for (const row of dispatchedRows) {
+          addEntry({
+            itemId: row.item_id,
+            changeQty: -row.change_qty,
+            valuePaisa: -row.value_paisa,
+            entryType: 'ADJUSTMENT',
+            sourceDoc: `Credit Note #${creditNoteId} (${inv.invoice_no})`,
+            userId: req.user.id
+          });
+        }
+      }
+
+      db.prepare("UPDATE invoices SET status = 'CANCELLED' WHERE id = ?").run(inv.id);
+      db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE id = ?").run(inv.order_id);
+
+      logAudit({
+        userId: req.user.id,
+        action: 'INVOICE_CANCELLED',
+        tableName: 'invoices',
+        recordId: inv.id,
+        oldValue: { status: inv.status, dispatched: inv.dispatched },
+        newValue: { status: 'CANCELLED', creditNoteId, reason }
+      });
+
+      return {
+        invoiceId: inv.id,
+        invoiceNo: inv.invoice_no,
+        status: 'CANCELLED',
+        creditNoteId,
+        credited_paisa: inv.total_paisa,
+        stockRestored: inv.dispatched === 1
+      };
+    });
+
+    res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
